@@ -36,6 +36,15 @@ jobs:
           mkdir -p _site
           cp -r index.html collab-firebase.js app-extras.js city-places.js fonts.css fonts sw.js firebase-config.js manifest.webmanifest icons vendor _site/
           touch _site/.nojekyll
+          # Liste des fichiers et numéro de version : l'appli Android s'en sert pour se mettre à jour toute seule
+          cd _site
+          python3 - <<'PY'
+          import json, os
+          files = sorted(os.path.relpath(os.path.join(d, f), ".") for d, _, fs in os.walk(".") for f in fs if f not in (".nojekyll", "version.json"))
+          version = os.environ["GITHUB_RUN_NUMBER"] + "-" + os.environ["GITHUB_SHA"][:7]
+          json.dump({"version": version, "files": files}, open("version.json", "w"), indent=1)
+          print(version, len(files), "fichiers")
+          PY
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
