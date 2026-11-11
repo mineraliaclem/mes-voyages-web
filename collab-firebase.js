@@ -13,6 +13,29 @@ const cache = {};           // id du voyage partagé -> { doc, photos: Map, hist
 let tripsLoaded = null, resolveTripsLoaded = null, listening = false;
 const listeners = new Set();
 
+// Applique les données partagées reçues sur le voyage en gardant les mêmes objets (villes, dépenses, idées…),
+// pour que les fenêtres de modification ouvertes continuent de viser les bons éléments.
+const SHARED_LISTS = ["cities", "items", "ideas", "photos", "preparation"];
+window.mergeSharedData = (trip, incoming) => {
+  const data = JSON.parse(JSON.stringify(incoming || {}));
+  for (const [key, value] of Object.entries(data)) {
+    if (SHARED_LISTS.includes(key) && Array.isArray(value)) {
+      const old = new Map((trip[key] || []).map(x => [String(x.id), x]));
+      const next = value.map(item => {
+        const current = old.get(String(item.id));
+        if (!current) return item;
+        if (JSON.stringify(current) !== JSON.stringify(item)) {
+          for (const k of Object.keys(current)) if (!(k in item)) delete current[k];
+          Object.assign(current, item);
+        }
+        return current;
+      });
+      if (Array.isArray(trip[key])) { trip[key].length = 0; trip[key].push(...next); } else trip[key] = next;
+    } else if (JSON.stringify(trip[key]) !== JSON.stringify(value)) trip[key] = value;
+  }
+  return trip;
+};
+
 window.inviteLink = code => WEB_URL + "?join=" + encodeURIComponent(code);
 window.inviteMessage = (name, code, link) =>
   `Rejoins le voyage « ${name} » dans Mes voyages.\nSur Android : touche « Rejoindre un voyage partagé » et entre le code ${code}.` + (link ? `\nSur iPhone : ouvre ce lien dans Safari ${link}` : "");
