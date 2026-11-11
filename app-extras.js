@@ -120,6 +120,20 @@ document.addEventListener("click", e => {
   showJoin(b.dataset.token).catch(err => toast(err.message));
 }, true);
 
+/* Carte : « − » au zoom minimal montre le pays entier, « + » ou « ↺ » revient au cadrage sur le trajet */
+window.mapFit = "trip";
+document.addEventListener("click", e => {
+  const b = e.target.closest('#app [data-act="mapzoom"],#app [data-act="mapreset"]');
+  if (!b) return;
+  const out = b.dataset.act === "mapzoom" && b.dataset.step === "-1";
+  if (out && mapZoom <= 1 && window.mapFit !== "country") { window.mapFit = "country"; }
+  else if (window.mapFit === "country" && (b.dataset.act === "mapreset" || (!out && mapZoom <= 1))) { window.mapFit = "trip"; }
+  else return;
+  e.preventDefault(); e.stopPropagation();
+  mapZoom = 1; mapPan = { x: 0, y: 0 };
+  render();
+}, true);
+
 /* Notifications Android */
 const fb = window.CollabFirebase;
 function nativeInfo() {
