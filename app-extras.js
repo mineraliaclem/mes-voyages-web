@@ -28,7 +28,7 @@ render = function () {
   baseRender();
   if (home) {
     const add = $(".home-add-trip") || $('#app [data-act="addtrip"]');
-    if (add && !$(".home-join-trip")) add.insertAdjacentHTML("afterend", `<button class="home-join-trip" data-extra="join">Rejoindre un voyage partagé</button>`);
+    if (add && !$(".home-join-trip")) add.insertAdjacentHTML("afterend", `<button class="home-join-trip" data-extra="join">Rejoindre un voyage partagé</button><label class="home-import-trips">Importer des voyages (fichier de sauvegarde)<input type="file" accept=".json,application/json,text/plain" data-extra="import" hidden></label>`);
   }
 };
 document.addEventListener("click", e => {
@@ -37,6 +37,39 @@ document.addEventListener("click", e => {
   e.preventDefault(); e.stopPropagation();
   openJoinCode();
 }, true);
+
+/* Importer des voyages depuis une sauvegarde (par exemple exportée du site ChatGPT) */
+document.addEventListener("change", async e => {
+  const input = e.target.closest('[data-extra="import"]');
+  if (!input || !input.files[0]) return;
+  try {
+    const raw = JSON.parse(await input.files[0].text());
+    const data = Array.isArray(raw) ? { trips: raw } : raw;
+    const trips = Array.isArray(data.trips) ? data.trips : [];
+    if (!trips.length) throw new Error("vide");
+    if (!T.profile && data.profile) T.profile = { ...data.profile };
+    const oldProfileId = data.profile && data.profile.id;
+    const ids = new Set(T.trips.map(t => String(t.id))), names = new Set(T.trips.map(t => t.name));
+    let added = 0;
+    for (const source of trips) {
+      const t = JSON.parse(JSON.stringify(source));
+      delete t.shared; delete t.syncConflict; delete t.sync;
+      if (ids.has(String(t.id))) t.id = uid();
+      if (names.has(t.name)) t.name += " (importé)";
+      // Le voyageur qui était « moi » dans la sauvegarde redevient « moi » ici
+      for (const p of t.participants || []) if (oldProfileId && p.profileId === oldProfileId && T.profile) p.profileId = T.profile.id;
+      for (const k of ["cities", "items", "ideas", "photos", "preparation"]) if (!Array.isArray(t[k])) t[k] = [];
+      t.currencies = t.currencies || ["EUR"]; t.rates = t.rates || { EUR: 1 }; t.tab = "g"; t.arm = 0;
+      T.trips.push(t); ids.add(String(t.id)); added++;
+    }
+    const ok = save();
+    render();
+    toast(ok ? `${added} voyage${added > 1 ? "s" : ""} importé${added > 1 ? "s" : ""} 🎉` : "Import fait, mais la mémoire du téléphone est pleine : retire quelques photos.");
+  } catch (err) {
+    toast("Ce fichier n’est pas une sauvegarde de Mes voyages.");
+  }
+  input.value = "";
+});
 
 /* Notifications Android */
 const fb = window.CollabFirebase;
