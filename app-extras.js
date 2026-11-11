@@ -93,6 +93,25 @@ document.addEventListener("change", async e => {
   input.value = "";
 });
 
+/* iPhone : lien d'invitation ouvert dans Safari ou dans WhatsApp, et non dans l'appli de l'écran d'accueil.
+   Ces navigateurs ont une mémoire séparée de l'appli : on explique comment rejoindre depuis l'appli. */
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const installed = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
+window.joinOutsideApp = token => {
+  if (!isIOS || installed || window.AndroidApp) return false;
+  history.replaceState({}, "", location.pathname);
+  const m = $("#modal");
+  m.innerHTML = `<section class="range-bubble ios-join" role="dialog" aria-modal="true"><h2>Rejoindre depuis l’appli</h2><p>Sur iPhone, l’appli de l’écran d’accueil ne partage pas sa mémoire avec ce navigateur. Pour rejoindre le voyage :</p><ol><li>Si l’icône « Mes voyages » n’est pas encore sur ton écran d’accueil : ouvre <b>mineraliaclem.github.io/mes-voyages-web</b> dans <b>Safari</b>, touche <b>Partager</b> puis <b>Sur l’écran d’accueil</b>.</li><li>Ouvre l’appli depuis son icône et crée ton profil.</li><li>Touche <b>Rejoindre un voyage partagé</b> et entre ce code :</li></ol><div class="invite-code">${esc(token)}</div><button class="ghost" data-act="cancel">Fermer</button><button type="button" class="ghost ios-join-here" data-extra="join-here" data-token="${esc(token)}">Continuer dans ce navigateur</button></section>`;
+  m.classList.add("on");
+  return true;
+};
+document.addEventListener("click", e => {
+  const b = e.target.closest('[data-extra="join-here"]');
+  if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  showJoin(b.dataset.token).catch(err => toast(err.message));
+}, true);
+
 /* Notifications Android */
 const fb = window.CollabFirebase;
 function nativeInfo() {

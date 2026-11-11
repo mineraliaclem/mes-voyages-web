@@ -350,6 +350,17 @@ async function collabBackend(path, method = "GET", payload) {
       const d = snap.data();
       await withTimeout(ref.collection("reads").doc(me.uid).set({ _joinedVersion: d.version || 0 }, { merge: true }));
       const photos = await withTimeout(ref.collection("photos").get({ source: "server" }));
+      // Place reprise : l'ancien compte (autre appareil ou navigateur) libère la place
+      const stale = (d.members || []).filter(m => String(m.slot) === String(payload.slot) && m.user !== me.uid);
+      if (stale.length) {
+        await withTimeout(db.runTransaction(async tx => {
+          const fresh = (await tx.get(ref)).data();
+          const gone = new Set((fresh.members || []).filter(m => String(m.slot) === String(payload.slot) && m.user !== me.uid).map(m => m.user));
+          tx.update(ref, { members: (fresh.members || []).filter(m => !gone.has(m.user)), memberIds: (fresh.memberIds || []).filter(u => !gone.has(u)) });
+        }));
+        d.members = (d.members || []).filter(m => !stale.includes(m));
+        d.memberIds = (d.memberIds || []).filter(u => !stale.some(m => m.user === u));
+      }
       const c = cache[info.trip] || subscribe(info.trip);
       c.doc = d; c.reads = { _joinedVersion: d.version || 0 };
       photos.forEach(p => c.photos.set(p.id, p.data()));
