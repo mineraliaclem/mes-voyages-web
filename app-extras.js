@@ -38,6 +38,21 @@ document.addEventListener("click", e => {
   openJoinCode();
 }, true);
 
+/* Me retrouver parmi les voyageurs d'un voyage (par mon prénom) quand aucun voyageur n'est relié à mon profil */
+const norm = x => (x || "").trim().toLocaleLowerCase("fr").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function linkMe() {
+  if (!T.profile || !T.profile.name) return false;
+  let changed = false;
+  for (const t of T.trips) {
+    const people = t.participants || [];
+    if (!people.length || people.some(p => p.profileId === T.profile.id)) continue;
+    const me = people.find(p => norm(p.name) === norm(T.profile.name)) || people.find(p => norm(p.name).split(/\s+/)[0] === norm(T.profile.name).split(/\s+/)[0]);
+    if (me) { me.profileId = T.profile.id; delete me.photo; changed = true; }
+  }
+  return changed;
+}
+setTimeout(() => { if (linkMe()) { save(); render(); } }, 3500);
+
 /* Importer des voyages depuis une sauvegarde (par exemple exportée du site ChatGPT) */
 document.addEventListener("change", async e => {
   const input = e.target.closest('[data-extra="import"]');
@@ -56,12 +71,19 @@ document.addEventListener("change", async e => {
       delete t.shared; delete t.syncConflict; delete t.sync;
       if (ids.has(String(t.id))) t.id = uid();
       if (names.has(t.name)) t.name += " (importé)";
-      // Le voyageur qui était « moi » dans la sauvegarde redevient « moi » ici
-      for (const p of t.participants || []) if (oldProfileId && p.profileId === oldProfileId && T.profile) p.profileId = T.profile.id;
+      // Le voyageur qui était « moi » dans la sauvegarde redevient « moi » ici,
+      // y compris dans un voyage rejoint (le lien était gardé par l'ancien serveur de partage)
+      const members = (source.shared && source.shared.members) || [];
+      for (const p of t.participants || []) {
+        const member = members.find(m => String(m.slot) === String(p.id));
+        if (member) { p.profileId = member.user; if (member.photo && !p.photo) p.photo = member.photo; if (member.name) p.name = member.name; }
+        if (oldProfileId && p.profileId === oldProfileId && T.profile) { p.profileId = T.profile.id; delete p.photo; }
+      }
       for (const k of ["cities", "items", "ideas", "photos", "preparation"]) if (!Array.isArray(t[k])) t[k] = [];
       t.currencies = t.currencies || ["EUR"]; t.rates = t.rates || { EUR: 1 }; t.tab = "g"; t.arm = 0;
       T.trips.push(t); ids.add(String(t.id)); added++;
     }
+    linkMe();
     const ok = save();
     render();
     toast(ok ? `${added} voyage${added > 1 ? "s" : ""} importé${added > 1 ? "s" : ""} 🎉` : "Import fait, mais la mémoire du téléphone est pleine : retire quelques photos.");
