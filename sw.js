@@ -1,6 +1,7 @@
 /* Mes voyages — mise en cache pour ouvrir l'appli sans connexion (version web) */
-const CACHE = "mes-voyages-v1";
-const SHELL = ["./", "index.html", "sync.js", "firebase-config.js", "manifest.webmanifest",
+const CACHE = "mes-voyages-v2";
+const SHELL = ["./", "index.html", "collab-firebase.js", "app-extras.js", "city-places.js", "fonts.css", "firebase-config.js", "manifest.webmanifest",
+  "fonts/font-0.ttf", "fonts/font-1.ttf", "fonts/font-2.ttf", "fonts/font-3.ttf", "fonts/font-4.ttf", "fonts/font-7.ttf",
   "vendor/firebase-app-compat.js", "vendor/firebase-auth-compat.js", "vendor/firebase-firestore-compat.js",
   "icons/apple-touch-icon.png", "icons/icon-192.png"];
 

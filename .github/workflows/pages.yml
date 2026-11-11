@@ -34,7 +34,7 @@ jobs:
       - name: Préparer le site
         run: |
           mkdir -p _site
-          cp -r index.html sync.js sw.js firebase-config.js manifest.webmanifest icons vendor _site/
+          cp -r index.html collab-firebase.js app-extras.js city-places.js fonts.css fonts sw.js firebase-config.js manifest.webmanifest icons vendor _site/
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5

@@ -1,13 +1,14 @@
 {
   "name": "Mes voyages",
   "short_name": "Mes voyages",
+  "description": "Ton carnet de voyages, dépenses et souvenirs.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FAF7F2",
-  "theme_color": "#FAF7F2",
+  "theme_color": "#638575",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
