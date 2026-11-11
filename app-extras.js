@@ -23,9 +23,17 @@ function openJoinCode() {
   };
 }
 
+/* Les sections ouvertes (Frais de départ, Pense-bête, catégories…) restent ouvertes quand l'écran est redessiné,
+   par exemple à l'arrivée d'une modification de l'autre voyageur */
+const foldKey = d => (d.closest("[data-widget]")?.dataset.widget || "") + "|" + (d.querySelector(":scope > summary")?.textContent || "").replace(/[\d\s€$£.,·:❤️-]+/gu, "").slice(0, 40);
 const baseRender = render;
 render = function () {
+  const open = new Set([...document.querySelectorAll("#app details[open]")].map(foldKey));
+  const where = home ? "home" : S ? `${S.id}|${S.tab}` : "";
+  const keep = where === render.lastWhere;
+  render.lastWhere = where;
   baseRender();
+  if (keep && open.size) document.querySelectorAll("#app details:not([open])").forEach(d => { if (open.has(foldKey(d))) d.open = true; });
   if (home) {
     const add = $(".home-add-trip") || $('#app [data-act="addtrip"]');
     if (add && !$(".home-join-trip")) add.insertAdjacentHTML("afterend", `<button class="home-join-trip" data-extra="join">Rejoindre un voyage partagé</button><label class="home-import-trips">Importer des voyages (fichier de sauvegarde)<input type="file" accept=".json,application/json,text/plain" data-extra="import" hidden></label>`);
