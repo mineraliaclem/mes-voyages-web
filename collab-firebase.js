@@ -36,6 +36,21 @@ window.mergeSharedData = (trip, incoming) => {
   return trip;
 };
 
+// Copie enregistrée dans la mémoire du téléphone : sans les photos déjà en ligne des voyages partagés
+// (le cache de Firebase les garde, y compris hors connexion). Les photos pas encore envoyées restent.
+window.sharedFresh = new Set();
+window.storageCopy = data => ({ ...data, trips: (data.trips || []).map(t => {
+  const base = t.shared && t.shared.base;
+  if (!base) return t;
+  const online = new Set((base.photos || []).map(p => String(p.id)));
+  const copy = { ...t, photos: (t.photos || []).filter(p => !online.has(String(p.id))) };
+  if (t.cover && t.cover === base.cover) delete copy.cover;
+  const lightBase = { ...base, photos: [] };
+  delete lightBase.cover;
+  copy.shared = { ...t.shared, base: lightBase };
+  return copy;
+}) });
+
 window.inviteLink = code => WEB_URL + "?join=" + encodeURIComponent(code);
 window.inviteMessage = (name, code, link) =>
   `Rejoins le voyage « ${name} » dans Mes voyages.\nSur Android : touche « Rejoindre un voyage partagé » et entre le code ${code}.` + (link ? `\nSur iPhone : ouvre ce lien dans Safari ${link}` : "");

@@ -134,6 +134,17 @@ document.addEventListener("click", e => {
   render();
 }, true);
 
+/* Photos récupérées par l'appli Android après une relance pendant le choix dans la galerie */
+window.addNativePhotos = list => {
+  if (!Array.isArray(list) || !list.length) return;
+  if (home || !S) { toast("Ouvre la ville du voyage puis ajoute les photos à nouveau."); return; }
+  const added = list.map((src, i) => ({ id: uid() + i, c: S.tab, src }));
+  S.photos.push(...added);
+  if (!save()) { S.photos = S.photos.filter(p => !added.includes(p)); toast("Mémoire pleine : les photos n’ont pas pu être ajoutées."); return; }
+  render();
+  toast(`${added.length} photo${added.length > 1 ? "s" : ""} ajoutée${added.length > 1 ? "s" : ""}`);
+};
+
 /* Notifications Android */
 const fb = window.CollabFirebase;
 function nativeInfo() {
