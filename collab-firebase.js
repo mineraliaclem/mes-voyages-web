@@ -16,6 +16,9 @@ const listeners = new Set();
 // Applique les données partagées reçues sur le voyage en gardant les mêmes objets (villes, dépenses, idées…),
 // pour que les fenêtres de modification ouvertes continuent de viser les bons éléments.
 const SHARED_LISTS = ["cities", "items", "ideas", "photos", "preparation"];
+// JSON avec les champs triés : deux objets identiques donnent le même texte, quel que soit l'ordre des champs
+const sortKeys = x => x && typeof x === "object" && !Array.isArray(x) ? Object.keys(x).sort().reduce((o, k) => (o[k] = x[k], o), {}) : x;
+window.stableJSON = v => v === undefined ? "null" : JSON.stringify(v, (k, x) => sortKeys(x));
 window.mergeSharedData = (trip, incoming) => {
   const data = JSON.parse(JSON.stringify(incoming || {}));
   for (const [key, value] of Object.entries(data)) {
@@ -24,14 +27,14 @@ window.mergeSharedData = (trip, incoming) => {
       const next = value.map(item => {
         const current = old.get(String(item.id));
         if (!current) return item;
-        if (JSON.stringify(current) !== JSON.stringify(item)) {
+        if (stableJSON(current) !== stableJSON(item)) {
           for (const k of Object.keys(current)) if (!(k in item)) delete current[k];
           Object.assign(current, item);
         }
         return current;
       });
       if (Array.isArray(trip[key])) { trip[key].length = 0; trip[key].push(...next); } else trip[key] = next;
-    } else if (JSON.stringify(trip[key]) !== JSON.stringify(value)) trip[key] = value;
+    } else if (stableJSON(trip[key]) !== stableJSON(value)) trip[key] = value;
   }
   return trip;
 };
@@ -311,16 +314,30 @@ async function collabBackend(path, method = "GET", payload) {
     if (parts.length === 2 && method === "GET") { if (!cache[id]) throw fail("Voyage introuvable", 404); return remoteOf(id); }
     if (parts.length === 2 && method === "PATCH") {
       const ops = (payload && payload.ops) || [];
-      const photoOps = ops.filter(o => o.collection === "photos" || o.field === "cover"), dataOps = ops.filter(o => !(o.collection === "photos" || o.field === "cover"));
+      const photoOps = ops.filter(o => o.collection === "photos" || o.field === "cover");
       const c = cache[id] || subscribe(id);
       let result = null;
       await withTimeout(db.runTransaction(async tx => {
         const snap = await tx.get(ref);
         if (!snap.exists) throw fail("Ce voyage n’est plus partagé.", 404);
         const d = snap.data(), before = d.data || {};
-        const next = applyOps(before, dataOps), version = (d.version || 0) + 1;
-        const entries = describeOps(before, ops);
-        tx.update(ref, { data: next, version, updatedAt: FV.serverTimestamp() });
+        // Un élément supprimé par l'autre voyageur ne revient pas par une modification ou un ajout tardifs
+        const deleted = { ...(d.deleted || {}) };
+        const isGone = (col, id) => (deleted[col] || []).includes(String(id));
+        const exists = (col, id) => col === "photos" ? c.photos.has(String(id)) : (before[col] || []).some(x => String(x.id) === String(id));
+        const kept = ops.filter(op => {
+          if (op.field) return true;
+          if (op.after === null) return true;
+          if (exists(op.collection, op.id)) return true;
+          if (op.before !== null) return false;            // modifié ici, mais supprimé ailleurs
+          return !isGone(op.collection, op.id);            // ré-ajout d'un élément supprimé
+        });
+        for (const op of kept) if (!op.field && op.after === null) deleted[op.collection] = [...(deleted[op.collection] || []).filter(x => x !== String(op.id)), String(op.id)].slice(-400);
+        const keptData = kept.filter(o => !(o.collection === "photos" || o.field === "cover")), keptPhotos = kept.filter(o => o.collection === "photos" || o.field === "cover");
+        photoOps.length = 0; photoOps.push(...keptPhotos);
+        const next = applyOps(before, keptData), version = (d.version || 0) + 1;
+        const entries = describeOps(before, kept);
+        tx.update(ref, { data: next, version, deleted, updatedAt: FV.serverTimestamp() });
         const order = photoList(c).length;
         photoOps.forEach((op, i) => {
           if (op.field === "cover") { const pr = ref.collection("photos").doc(COVER); op.after ? tx.set(pr, { value: op.after }) : tx.delete(pr); }
