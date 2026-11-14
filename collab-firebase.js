@@ -47,9 +47,7 @@ window.storageCopy = data => ({ ...data, trips: (data.trips || []).map(t => {
   if (!base) return t;
   const online = new Set((base.photos || []).map(p => String(p.id)));
   const copy = { ...t, photos: (t.photos || []).filter(p => !online.has(String(p.id))) };
-  if (t.cover && t.cover === base.cover) delete copy.cover;
   const lightBase = { ...base, photos: [] };
-  delete lightBase.cover;
   copy.shared = { ...t.shared, base: lightBase };
   return copy;
 }) });
@@ -326,6 +324,7 @@ async function collabBackend(path, method = "GET", payload) {
         const isGone = (col, id) => (deleted[col] || []).includes(String(id));
         const exists = (col, id) => col === "photos" ? c.photos.has(String(id)) : (before[col] || []).some(x => String(x.id) === String(id));
         const kept = ops.filter(op => {
+          if (op.field === "cover") return !!op.after;      // jamais d'effacement de la couverture
           if (op.field) return true;
           if (op.after === null) return true;
           if (exists(op.collection, op.id)) return true;
