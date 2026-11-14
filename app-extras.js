@@ -32,7 +32,10 @@ render = function () {
   const where = home ? "home" : S ? `${S.id}|${S.tab}` : "";
   const keep = where === render.lastWhere;
   render.lastWhere = where;
+  const y = window.scrollY;
   baseRender();
+  // Même écran : on garde la position (l'écran ne remonte plus quand une modification arrive)
+  if (keep && Math.abs(window.scrollY - y) > 4) window.scrollTo(0, y);
   if (keep && open.size) document.querySelectorAll("#app details:not([open])").forEach(d => { if (open.has(foldKey(d))) d.open = true; });
   if (home) {
     const add = $(".home-add-trip") || $('#app [data-act="addtrip"]');
@@ -144,6 +147,20 @@ window.addNativePhotos = list => {
   render();
   toast(`${added.length} photo${added.length > 1 ? "s" : ""} ajoutée${added.length > 1 ? "s" : ""}`);
 };
+
+/* Version web (iPhone) : l'appli peut rester ouverte en arrière-plan pendant des jours.
+   Quand on y revient et qu'une nouvelle version est en ligne, elle se recharge toute seule. */
+if (!window.AndroidApp && location.protocol === "https:") {
+  let loadedVersion = null, lastCheck = 0;
+  const fetchVersion = () => fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => j && j.version).catch(() => null);
+  fetchVersion().then(v => { loadedVersion = v; });
+  document.addEventListener("visibilitychange", async () => {
+    if (document.hidden || !loadedVersion || Date.now() - lastCheck < 60e3) return;
+    lastCheck = Date.now();
+    const v = await fetchVersion();
+    if (v && v !== loadedVersion && !$("#modal").classList.contains("on")) location.reload();
+  });
+}
 
 /* Notifications Android */
 const fb = window.CollabFirebase;
